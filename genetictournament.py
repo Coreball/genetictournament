@@ -4,8 +4,10 @@ from sys import exit
 from time import strftime, localtime
 
 
-settings = {}
+parameter_settings = []
+algorithm_settings = {}
 verbose = False
+
 
 def setup_arguments():
     # Argument parser for command line arguments
@@ -21,40 +23,64 @@ def setup_arguments():
     verbose = args.verbose
     # Read input file and assign to settings dictionary
     print("Reading input from %s" % args.input)
+    reading_type = 0
     try:
         with open(args.input) as file:
             for line in file:
-                if not line.startswith('#') and line.strip():  # Ignore comments and blank lines
-                    (key, val) = line.split()
-                    settings[key] = val
+                line = line.strip()
+                if line == '[PARAMETERS]':
+                    reading_type = 1
+                elif line == '[ALGORITHM]':
+                    reading_type = 2
+                elif not line.startswith('#') and line:  # Ignore comments and blank lines
+                    # Add parameter ranges, if a single number it's not going to mutate/change
+                    if reading_type == 1:
+                        if line.startswith('1'):
+                            (_, min, max) = line.split()
+                            parameter_settings.append([float(min), float(max)])
+                        elif line.startswith('0'):
+                            (_, value) = line.split()
+                            parameter_settings.append(float(value))
+                    # Read algorithm settings
+                    elif reading_type == 2:
+                        (key, val) = line.split()
+                        algorithm_settings[key] = float(val)
     except IOError:
         exit("File not found")
-    # except ValueError:
-    #     exit("Input file formatted incorrectly")
-    print("Settings: %s\n" % settings)
+    except ValueError:
+        exit("Input file formatted incorrectly")
+    print("Parameter Settings: %s" % parameter_settings)
+    print("Algorithm Settings: %s\n" % algorithm_settings)
     # Check to see that all required settings were given to script
     required_settings = ['population_size', 'convergence_criterion', 'crossover_probability', 'mutation_probability',
-                         'tournament_size', 'tournament_size_losers', 'gene_minvalue', 'gene_maxvalue',
-                         'max_generations']
+                         'tournament_size', 'tournament_size_losers', 'max_generations']
     for required_setting in required_settings:
-        if required_setting not in settings:
+        if required_setting not in algorithm_settings:
             exit("Not all required settings found in input file")
+    # Check to see that at least one thing can be optimized
+    contains_at_least_one_modifiable = False
+    for gene in parameter_settings:
+        if type(gene) is list and gene[0] != gene[1]:
+            contains_at_least_one_modifiable = True
+    if not contains_at_least_one_modifiable:
+        exit("You need at least one modifiable value to run a genetic algorithm!")
 
 
 def run():
     # Set up initial population
     generation = 0
-    population = Population(int(settings['population_size']))
+    population = Population(int(algorithm_settings['population_size']))
     # Find current fittest
     most_fit = population.get_most_fit()
     print("Generation: %d | Most Fit: %s | Fitness: %f\n" % (generation, most_fit.chromosome, most_fit.fitness))
     # Loop
-    while most_fit.fitness > float(settings['convergence_criterion']) and generation < int(settings['max_generations']):
+    while most_fit.fitness > algorithm_settings['convergence_criterion']\
+            and generation < int(algorithm_settings['max_generations']):
         generation += 1
         population.selection()  # Could use alternate selections when close to converging
-        if random() < float(settings['crossover_probability']):  # Probability of crossover
+        if random() < algorithm_settings['crossover_probability']:  # Probability of crossover
             offspring = population.crossover()
-            if random() < float(settings['mutation_probability'])\
+            if random() < algorithm_settings['mutation_probability']\
                     or population.fit_one.chromosome == population.fit_two.chromosome:  # Probability of mutation
                 offspring.mutation()
             population.find_not_fit()
@@ -63,7 +89,7 @@ def run():
         most_fit = population.get_most_fit()
         print("Generation: %d | Most Fit: %s | Fitness: %f%s" % (generation, most_fit.chromosome, most_fit.fitness,
                                                                  '\n' if verbose else ''))
-    if generation >= int(settings['max_generations']):
+    if generation >= int(algorithm_settings['max_generations']):
         print("\nStop on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
     else:
         print("\nConverged on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
@@ -102,8 +128,8 @@ class Population:
 
     def selection(self):
         # Tournament Selection
-        tournament_one = sample(self.population, int(settings['tournament_size']))
-        tournament_two = sample(self.population, int(settings['tournament_size']))
+        tournament_one = sample(self.population, int(algorithm_settings['tournament_size']))
+        tournament_two = sample(self.population, int(algorithm_settings['tournament_size']))
         # Find which is the most fit in each tournament
         self.fit_one = min(tournament_one, key=lambda individual: individual.fitness)
         self.fit_two = min(tournament_two, key=lambda individual: individual.fitness)
@@ -113,7 +139,7 @@ class Population:
 
     def find_not_fit(self):
         # Tournament Selection
-        tournament_not_fit = sample(self.population, int(settings['tournament_size_losers']))
+        tournament_not_fit = sample(self.population, int(algorithm_settings['tournament_size_losers']))
         # Find which is the most fit in each tournament
         self.not_fit = max(tournament_not_fit, key=lambda individual: individual.fitness)
         if verbose:
@@ -134,14 +160,20 @@ class Individual:
     def __init__(self):
         # Randomly initialize chromosome
         self.chromosome = []
-        for _ in range(0, 6):  # ATTENTION CHANGE GENE SETUP/NUMBER BASED ON FITNESS FUNCTION
-            self.chromosome.append(uniform(float(settings['gene_minvalue']), float(settings['gene_maxvalue'])))
+        for gene in range(0, len(parameter_settings)):
+            if type(parameter_settings[gene]) is float:
+                self.chromosome.append(parameter_settings[gene])
+            else:
+                self.chromosome.append(uniform(parameter_settings[gene][0], parameter_settings[gene][1]))
         # Find initial fitness
         self.fitness = fitness(self.chromosome)
 
     def mutation(self):
+        # Mutate at a random mutationable index
         mutate_index = randint(0, len(self.chromosome) - 1)
-        self.chromosome[mutate_index] = uniform(float(settings['gene_minvalue']), float(settings['gene_maxvalue']))
+        while not type(parameter_settings[mutate_index]) is list:  # Keep trying to find a mutationable index
+            mutate_index = randint(0, len(self.chromosome) - 1)
+        self.chromosome[mutate_index] = uniform(parameter_settings[mutate_index][0], parameter_settings[mutate_index][1])
         if verbose:
             print("Mutated chromosome: %s" % self.chromosome)
 
