@@ -10,6 +10,7 @@ verbose = False
 
 
 def setup_arguments():
+    """Take command-line arguments and read the input file"""
     # Argument parser for command line arguments
     parser = ArgumentParser(description="Genetic Algorithm Tournament Script")
     parser.add_argument('-v', '--verbose', action='store_true', help="Display extra information when running")
@@ -67,6 +68,7 @@ def setup_arguments():
 
 
 def run():
+    """Run the genetic algorithm"""
     # Set up initial population
     generation = 0
     population = Population(int(algorithm_settings['population_size']))
@@ -97,6 +99,7 @@ def run():
 
 
 def fitness(chromosome):
+    """Determine the fitness of a particular chromosome and return its fitness value"""
     # Define a custom fitness function here!
     score = ((chromosome[0] - 0.1) ** 2 + (chromosome[1] - 1.5) ** 2 + (chromosome[2] - 3.0) ** 2
              + (chromosome[3] - 4.44) ** 2 + (chromosome[4] - 5.0) ** 2 + (chromosome[5] - 10.0) ** 2)
@@ -104,6 +107,7 @@ def fitness(chromosome):
 
 
 class Population:
+    """Represents a population with multiple chromosomes advancing through generations"""
 
     def __init__(self, population_size):
         self.population = []
@@ -120,13 +124,16 @@ class Population:
         print('')
 
     def update_all_fitness(self):
+        """Update fitness for all chromosomes in population"""
         for individual in self.population:
             individual.fitness = fitness(individual.chromosome)
 
     def get_most_fit(self):
+        """Return the fittest chromosome in the population"""
         return min(self.population, key=lambda individual: individual.fitness)
 
     def selection(self):
+        """Update the two parent chromosomes by way of tournament selection"""
         # Tournament Selection
         tournament_one = sample(self.population, int(algorithm_settings['tournament_size']))
         tournament_two = sample(self.population, int(algorithm_settings['tournament_size']))
@@ -138,6 +145,7 @@ class Population:
             print("Parent TWO Chromosome: %s | Fitness: %f" % (self.fit_two.chromosome, self.fit_two.fitness))
 
     def find_not_fit(self):
+        """Update the not-fit chromosome to be removed by tournament selection"""
         # Tournament Selection
         tournament_not_fit = sample(self.population, int(algorithm_settings['tournament_size_losers']))
         # Find which is the most fit in each tournament
@@ -146,7 +154,7 @@ class Population:
             print("Unfit chromosome to be replaced: %s | Fitness %f" % (self.not_fit.chromosome, self.not_fit.fitness))
 
     def crossover(self):
-        # Make a new individual and set chromosome by averaging parents
+        """Make a new individual and set its chromosome by averaging the parents (two fit individuals)"""
         baby = Individual()
         for index in range(0, len(baby.chromosome)):
             baby.chromosome[index] = (self.fit_one.chromosome[index] + self.fit_two.chromosome[index]) / 2
@@ -156,6 +164,7 @@ class Population:
 
 
 class Individual:
+    """An individual chromosome"""
 
     def __init__(self):
         # Randomly initialize chromosome
@@ -169,7 +178,7 @@ class Individual:
         self.fitness = fitness(self.chromosome)
 
     def mutation(self):
-        # Mutate at a random mutationable index
+        """Mutate at a random mutationable index"""
         mutate_index = randint(0, len(self.chromosome) - 1)
         while not type(parameter_settings[mutate_index]) is list:  # Keep trying to find a mutationable index
             mutate_index = randint(0, len(self.chromosome) - 1)
