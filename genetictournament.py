@@ -54,17 +54,19 @@ def run():
         population.selection()  # Could use alternate selections when close to converging
         if random() < float(settings['crossover_probability']):  # Probability of crossover
             offspring = population.crossover()
-            if random() < float(settings['mutation_probability']):  # Probability of mutation
+            if random() < float(settings['mutation_probability'])\
+                    or population.fit_one.chromosome == population.fit_two.chromosome:  # Probability of mutation
                 offspring.mutation()
             population.find_not_fit()
             population.not_fit.chromosome = offspring.chromosome
         population.update_all_fitness()
         most_fit = population.get_most_fit()
-        print("Generation: %d | Most Fit: %s | Fitness: %f\n" % (generation, most_fit.chromosome, most_fit.fitness))
+        print("Generation: %d | Most Fit: %s | Fitness: %f%s" % (generation, most_fit.chromosome, most_fit.fitness,
+                                                                 '\n' if verbose else ''))
     if generation >= int(settings['max_generations']):
-        print("Stop on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
+        print("\nStop on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
     else:
-        print("Converged on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
+        print("\nConverged on Generation: %d | Chromosome: %s" % (generation, most_fit.chromosome))
     print("End: %s" % strftime("%d %b %Y %H:%M:%S %z", localtime()))
 
 
