@@ -5,6 +5,7 @@ from time import strftime, localtime
 
 
 parameter_settings = []
+extfit_settings = {}
 algorithm_settings = {}
 verbose = False
 
@@ -31,8 +32,10 @@ def setup_arguments():
                 line = line.strip()
                 if line == '[PARAMETERS]':
                     reading_type = 1
-                elif line == '[ALGORITHM]':
+                elif line == '[EXTFIT]':
                     reading_type = 2
+                elif line == '[ALGORITHM]':
+                    reading_type = 3
                 elif not line.startswith('#') and line:  # Ignore comments and blank lines
                     # Add parameter ranges, if a single number it's not going to mutate/change
                     if reading_type == 1:
@@ -42,8 +45,11 @@ def setup_arguments():
                         elif line.startswith('0'):
                             (_, value) = line.split()
                             parameter_settings.append(float(value))
-                    # Read algorithm settings
                     elif reading_type == 2:
+                        (key, val) = line.split()
+                        extfit_settings[key] = val
+                    # Read algorithm settings
+                    elif reading_type == 3:
                         (key, val) = line.split()
                         algorithm_settings[key] = float(val)
     except IOError:
@@ -53,11 +59,23 @@ def setup_arguments():
     print("Parameter Settings: %s" % parameter_settings)
     print("Algorithm Settings: %s\n" % algorithm_settings)
     # Check to see that all required settings were given to script
-    required_settings = ['population_size', 'convergence_criterion', 'crossover_probability', 'mutation_probability',
+    required_algorithm_settings = ['population_size', 'convergence_criterion', 'crossover_probability', 'mutation_probability',
                          'tournament_size', 'tournament_size_losers', 'max_generations']
-    for required_setting in required_settings:
-        if required_setting not in algorithm_settings:
-            exit("Not all required settings found in input file")
+    for required_algorithm_setting in required_algorithm_settings:
+        if required_algorithm_setting not in algorithm_settings:
+            exit("Not all required algorithm settings found in input file")
+    # Check to see that the extfit settings were given correctly
+    required_extfit_settings = ['fitness_mode', 'external_write', 'external_script', 'external_read']
+    if 'fitness_mode' not in extfit_settings:
+        exit("The parameter fitness_mode was not found")
+    if extfit_settings['fitness_mode'] == 'internal':
+        pass
+    elif extfit_settings['fitness_mode'] == 'external':
+        for required_extfit_setting in required_extfit_settings:
+            if required_extfit_setting not in extfit_settings:
+                exit("Not all required external fitness settings found in input file")
+    else:
+        exit("The parameter fitness_mode was not set to 'internal' or 'external'")
     # Check to see that at least one thing can be optimized
     contains_at_least_one_modifiable = False
     for gene in parameter_settings:
