@@ -1,4 +1,4 @@
-from random import randint, sample, random, uniform
+from random import randint, sample, random, uniform, seed
 from argparse import ArgumentParser
 from sys import exit
 from time import strftime, localtime
@@ -52,7 +52,10 @@ def setup_arguments():
                     # Read algorithm settings
                     elif reading_type == 3:
                         (key, val) = line.split()
-                        algorithm_settings[key] = float(val)
+                        if key == 'seed':
+                            algorithm_settings[key] = val
+                        else:
+                            algorithm_settings[key] = float(val)
     except IOError:
         exit("File not found")
     except ValueError:
@@ -63,7 +66,7 @@ def setup_arguments():
     # Check to see that all required settings were given to script
     required_algorithm_settings = ['population_size', 'convergence_criterion', 'crossover_probability',
                                    'mutation_probability', 'tournament_size', 'tournament_size_losers',
-                                   'max_generations']
+                                   'max_generations', 'seed']
     for required_algorithm_setting in required_algorithm_settings:
         if required_algorithm_setting not in algorithm_settings:
             exit("Not all required algorithm settings found in input file")
@@ -90,6 +93,8 @@ def setup_arguments():
 
 def run():
     """Run the genetic algorithm"""
+    # Set the random seed
+    seed(algorithm_settings['seed'])
     # Set up initial population
     generation = 0
     population = Population(int(algorithm_settings['population_size']))
