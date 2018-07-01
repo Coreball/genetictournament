@@ -2,6 +2,7 @@ from random import randint, sample, random, uniform
 from argparse import ArgumentParser
 from sys import exit
 from time import strftime, localtime
+from subprocess import call
 
 
 parameter_settings = []
@@ -57,10 +58,12 @@ def setup_arguments():
     except ValueError:
         exit("Input file formatted incorrectly")
     print("Parameter Settings: %s" % parameter_settings)
+    print("External Fitness Settings: %s" % extfit_settings)
     print("Algorithm Settings: %s\n" % algorithm_settings)
     # Check to see that all required settings were given to script
-    required_algorithm_settings = ['population_size', 'convergence_criterion', 'crossover_probability', 'mutation_probability',
-                         'tournament_size', 'tournament_size_losers', 'max_generations']
+    required_algorithm_settings = ['population_size', 'convergence_criterion', 'crossover_probability',
+                                   'mutation_probability', 'tournament_size', 'tournament_size_losers',
+                                   'max_generations']
     for required_algorithm_setting in required_algorithm_settings:
         if required_algorithm_setting not in algorithm_settings:
             exit("Not all required algorithm settings found in input file")
@@ -90,6 +93,7 @@ def run():
     # Set up initial population
     generation = 0
     population = Population(int(algorithm_settings['population_size']))
+    population.update_all_fitness()
     # Find current fittest
     most_fit = population.get_most_fit()
     print("Generation: %d | Most Fit: %s | Fitness: %f\n" % (generation, most_fit.chromosome, most_fit.fitness))
@@ -116,12 +120,25 @@ def run():
     print("End: %s" % strftime("%d %b %Y %H:%M:%S %z", localtime()))
 
 
-def fitness(chromosome):
+def internal_fitness(chromosome):
     """Determine the fitness of a particular chromosome and return its fitness value"""
     # Define a custom fitness function here!
     score = ((chromosome[0] - 0.1) ** 2 + (chromosome[1] - 1.5) ** 2 + (chromosome[2] - 3.0) ** 2
              + (chromosome[3] - 4.44) ** 2 + (chromosome[4] - 5.0) ** 2 + (chromosome[5] - 10.0) ** 2)
     return score
+
+
+def external_fitness(population):
+    # Write parameters to a file, one chromosome per line
+    with open(extfit_settings['external_write'], 'w') as write_file:
+        for individual in population:
+            write_file.write('  '.join('%12.6f' % gene for gene in individual.chromosome) + '\n')  # Python OMG
+    # Call the Perl script and wait for it to finish
+    call('perl ' + extfit_settings['external_script'])
+    # Read the output and update fitness values
+    with open(extfit_settings['external_read']) as read_file:
+        for num, line in enumerate(read_file):  # enumerate gives us a counter as well
+            population[num].fitness = float(line)
 
 
 class Population:
@@ -143,8 +160,11 @@ class Population:
 
     def update_all_fitness(self):
         """Update fitness for all chromosomes in population"""
-        for individual in self.population:
-            individual.fitness = fitness(individual.chromosome)
+        if extfit_settings['fitness_mode'] == 'internal':
+            for individual in self.population:
+                individual.fitness = internal_fitness(individual.chromosome)
+        else:
+            external_fitness(self.population)
 
     def get_most_fit(self):
         """Return the fittest chromosome in the population"""
@@ -192,8 +212,7 @@ class Individual:
                 self.chromosome.append(parameter_settings[gene])
             else:
                 self.chromosome.append(uniform(parameter_settings[gene][0], parameter_settings[gene][1]))
-        # Find initial fitness
-        self.fitness = fitness(self.chromosome)
+        self.fitness = 0
 
     def mutation(self):
         """Mutate at a random mutationable index"""
